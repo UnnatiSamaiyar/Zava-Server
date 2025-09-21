@@ -9,10 +9,11 @@ import { socketSendMessage } from "./src/controllers/messageController.js";
 export const initializeSocket = (server) => {
   // creating socket.io instence
   const io = new Server(server, {
-    cors: process.env.FRONT_URL,
-    methods: ["GET", "POST"],
-    pingInterval: 25000,
-    pingTimeout: 20000,
+    cors: {
+      origin: process.env.FRONT_URL, // e.g. "https://lime-kangaroo-557352.hostingersite.com"
+      methods: ["GET", "POST"],
+      credentials: true,
+    },
   });
 
   // socket protect middleware
