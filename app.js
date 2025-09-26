@@ -16,7 +16,6 @@ import router from "./src/routes/index.js";
 
 // dotenv config
 dotenv.config();
-console.log("Loaded FRONT_URL:", process.env.FRONT_URL);
 
 // creating express app
 const app = express();
@@ -27,7 +26,7 @@ app.set("trust proxy", 1);
 // cors setup
 app.use(
   cors({
-    origin: process.env.FRONT_URL || "https://lime-kangaroo-557352.hostingersite.com",
+    origin: process.env.FRONT_URL || "http://localhost:3000",
     credentials: true,
   })
 );
@@ -53,7 +52,6 @@ app.use(compression()); // gzip compression
 app.get("/", (req, res) => {
   res.send("Welcome to Zava Backend😺");
 });
-
 
 // using api routes
 app.use("/api", router);

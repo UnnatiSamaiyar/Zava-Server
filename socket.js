@@ -1,3 +1,4 @@
+// backend/src/socket.js
 import { Server } from "socket.io"; // socket io
 import mongoose from "mongoose";
 
@@ -6,15 +7,18 @@ import { emitFriendStatus } from "./src/controllers/friendsController.js";
 import { joinConvo } from "./src/controllers/conversationController.js";
 import { socketSendMessage } from "./src/controllers/messageController.js";
 
+let ioInstance = null;
+
 export const initializeSocket = (server) => {
-  // creating socket.io instence
+  // creating socket.io instance
   const io = new Server(server, {
-    cors: {
-      origin: process.env.FRONT_URL, // e.g. "https://lime-kangaroo-557352.hostingersite.com"
-      methods: ["GET", "POST"],
-      credentials: true,
-    },
+    cors: process.env.FRONT_URL || "*",
+    methods: ["GET", "POST"],
+    pingInterval: 25000,
+    pingTimeout: 20000,
   });
+
+  ioInstance = io; // store globally so other modules can access via getIO()
 
   // socket protect middleware
   io.use(socketMiddleware);
@@ -37,7 +41,7 @@ export const initializeSocket = (server) => {
     const user = socket.user;
     const user_id = socket.user._id.toString();
 
-    // join user with socket
+    // join user with socket (personal room)
     socket.join(user_id);
 
     // set user online
@@ -58,7 +62,7 @@ export const initializeSocket = (server) => {
     });
     // ------------------------------------------------------
 
-    // ---------------Send Message Hanling---------------
+    // ---------------Send Message Handling---------------
     socket.on("send_message", (message) => {
       try {
         const conversation = message.conversation;
@@ -78,7 +82,7 @@ export const initializeSocket = (server) => {
           socket.emit("message_received", message);
         }
 
-        // emit message to each user(could be fr group)
+        // emit message to each user (could be for group)
         conversation.users.forEach((user) => {
           if (user._id !== message.sender._id) {
             socket.in(user._id).emit("message_received", message);
@@ -89,7 +93,7 @@ export const initializeSocket = (server) => {
       }
     });
 
-    // ---------------Typing Message Hanling---------------
+    // ---------------Typing Message Handling---------------
     socket.on("start_typing", (conversation_id) => {
       try {
         socket.in(conversation_id).emit("start_typing", {
@@ -112,3 +116,6 @@ export const initializeSocket = (server) => {
     });
   });
 };
+
+// Allow other modules to get the io instance (returns null if not initialized yet)
+export const getIO = () => ioInstance;
