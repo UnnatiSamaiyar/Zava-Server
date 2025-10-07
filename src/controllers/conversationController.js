@@ -398,6 +398,11 @@ import {
 
 import ConversationModel from "../models/conversationModel.js";
 
+import crypto from "crypto";
+
+import InviteModel from "../models/inviteModel.js";
+import { nanoid } from "nanoid";
+
 /**
  * Create / Open Direct Conversation
  */
@@ -753,3 +758,78 @@ export const updateGroupMeta = async (req, res, next) => {
     next(err);
   }
 };
+
+/**
+ * Generate invite link (admin only)
+ * POST /conversation/:conversationId/invite
+ */
+export const generateInvite = async (req, res, next) => {
+  try {
+    const { conversationId } = req.params;
+    const conv = await ConversationModel.findById(conversationId);
+
+    if (!conv) return res.status(404).json({ status: "fail", message: "Conversation not found" });
+    if (!conv.isGroup) return res.status(400).json({ status: "fail", message: "Not a group" });
+    if (conv.admin.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ status: "fail", message: "Only admin can generate invite links" });
+    }
+
+    const code = nanoid(10);
+
+    const invite = await InviteModel.create({
+      code,
+      conversation: conv._id,
+      createdBy: req.user._id,
+      expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000, // expire in 7 days
+    });
+
+    res.status(201).json({
+      status: "success",
+      inviteLink: `${process.env.FRONTEND_URL}/join/${code}`,
+      invite,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * Join group via invite code
+ * POST /conversation/join/:inviteCode
+ */
+export const joinByInvite = async (req, res, next) => {
+  try {
+    const { inviteCode } = req.params;
+
+    const invite = await InviteModel.findOne({ code: inviteCode }).populate("conversation");
+
+    if (!invite)
+      return res.status(404).json({ status: "fail", message: "Invite not found" });
+
+    if (invite.expiresAt < new Date()) {
+      return res.status(410).json({ status: "fail", message: "Invite expired" });
+    }
+
+    const conv = await ConversationModel.findById(invite.conversation._id);
+    if (!conv)
+      return res.status(404).json({ status: "fail", message: "Group not found" });
+
+    // ✅ Use $addToSet to prevent duplicate members automatically
+    await ConversationModel.updateOne(
+      { _id: conv._id },
+      { $addToSet: { users: req.user._id } }
+    );
+
+    const updatedConv = await ConversationModel.findById(conv._id)
+      .populate("users", "firstName lastName avatar email")
+      .populate("admin", "firstName lastName avatar email");
+
+    return res.status(200).json({
+      status: "success",
+      conversation: updatedConv,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+

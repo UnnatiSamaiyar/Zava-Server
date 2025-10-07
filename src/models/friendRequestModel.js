@@ -1,21 +1,25 @@
-// model for friend requests
 import mongoose from "mongoose";
 
-const requestSchema = new mongoose.Schema({
-  sender: {
-    // reffering to the users id
-    type: mongoose.Schema.ObjectId,
-    ref: "User",
+const requestSchema = new mongoose.Schema(
+  {
+    sender: {
+      type: mongoose.Schema.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    recipient: {
+      type: mongoose.Schema.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    status: {
+      type: String,
+      enum: ["pending", "accepted", "rejected"],
+      default: "pending",
+    },
   },
-  recipient: {
-    type: mongoose.Schema.ObjectId,
-    ref: "User",
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now(),
-  },
-});
+  { timestamps: true } // auto adds createdAt, updatedAt
+);
 
 const FriendRequestModel = mongoose.model("FriendRequest", requestSchema);
 

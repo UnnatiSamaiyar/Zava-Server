@@ -12,6 +12,8 @@ import {
   leaveGroup,
   updateGroupMeta,
   getConversationById,
+  generateInvite,
+  joinByInvite,
 } from "../controllers/conversationController.js";
 
 const conversationRouter = express.Router();
@@ -55,5 +57,17 @@ conversationRouter
 conversationRouter
   .route("/:conversationId")
   .patch(trimRequest.all, protect, updateGroupMeta);
+
+
+// Generate invite (admin only)
+conversationRouter
+  .route("/:conversationId/invite")
+  .post(trimRequest.all, protect, generateInvite);
+
+// Join group via invite
+conversationRouter
+  .route("/join/:inviteCode")
+  .post(trimRequest.all, protect, joinByInvite);
+
 
 export default conversationRouter;

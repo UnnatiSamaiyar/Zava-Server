@@ -12,47 +12,60 @@ import { ConversationModel } from "../models/index.js";
 export const sendMessage = async (req, res, next) => {
   try {
     const user_id = req.user._id;
-    const { message, convo_id, files } = req.body;
+    const { message, convo_id, files = [] } = req.body;
 
-    if (!convo_id || (!message && !files)) {
-      throw createHttpError.BadRequest("Invalid conversation id or message");
+    // ✅ Basic validation
+    if (!convo_id || (!message && files.length === 0)) {
+      return res.status(400).json({
+        status: "fail",
+        message: "Invalid conversation ID or empty message",
+      });
     }
 
-    const convo_exists = await ConversationModel.findById({ _id: convo_id });
-
-    if (!convo_exists) {
-      throw createHttpError.NotFound("Conversation does not exist");
+    // ✅ Validate conversation existence
+    const convo = await ConversationModel.findById(convo_id);
+    if (!convo) {
+      return res.status(404).json({ status: "fail", message: "Conversation not found" });
     }
 
-    // Check if there's only one user in the conversation and it's the current user
-    if (
-      !(
-        convo_exists.users.length === 1 &&
-        convo_exists.users[0].toString() === user_id.toString()
-      )
-    ) {
-      // Check if users are friends
-      await validateFriendship(user_id, convo_exists);
+    // ✅ Allow self-chat (1-user) OR validate friendship for 1:1 chats
+    if (!(convo.users.length === 1 && convo.users[0].toString() === user_id.toString())) {
+      await validateFriendship(user_id, convo);
     }
 
+    // ✅ Create new message
     const msgData = {
       sender: user_id,
       message,
       conversation: convo_id,
-      files: files || [],
+      files,
     };
 
     const newMessage = await createMessage(msgData);
 
+    // ✅ Update latest message
     await updateLatestMessage(convo_id, newMessage);
 
+    // ✅ Populate sender & conversation for frontend
     const populatedMessage = await populateMessage(newMessage._id);
+
+    // ✅ Emit via socket to all members in conversation
+    try {
+      const { getIO } = await import("../../socket.js");
+      const io = getIO();
+      convo.users.forEach((uid) => {
+        io.to(uid.toString()).emit("new_message", populatedMessage);
+      });
+    } catch (err) {
+      console.log("Socket emit failed", err.message);
+    }
 
     res.status(200).json({ status: "success", message: populatedMessage });
   } catch (error) {
     next(error);
   }
 };
+
 
 // -------------------------- Get All Messages --------------------------
 export const getMessages = async (req, res, next) => {
@@ -90,16 +103,23 @@ export const socketSendMessage = async (socket, user_id, messageData) => {
       throw createHttpError.NotFound("Conversation does not exist");
     }
 
-    // Check if there's only one user in the conversation and it's the current user
-    if (
-      !(
-        convo_exists.users.length === 1 &&
-        convo_exists.users[0].toString() === user_id.toString()
-      )
-    ) {
-      // Check if users are friends
-      await validateFriendship(user_id, convo_exists);
-    }
+    // // Check if there's only one user in the conversation and it's the current user
+    // if (
+    //   !(
+    //     convo_exists.users.length === 1 &&
+    //     convo_exists.users[0].toString() === user_id.toString()
+    //   )
+    // ) {
+    //   // Check if users are friends
+    //   await validateFriendship(user_id, convo_exists);
+    // }
+
+
+    // ✅ Only validate friendship for direct (non-group) conversations
+if (!convo_exists.isGroup) {
+  await validateFriendship(user_id, convo_exists);
+}
+
 
     const msgData = {
       _id: _id,

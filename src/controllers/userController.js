@@ -3,7 +3,7 @@ import validator from "validator";
 
 import { deleteFile, uploadFiles } from "../services/fileUploadService.js";
 import { searchForUsers, validateAvatar } from "../services/userService.js";
-import { UserModel } from "../models/index.js";
+import { UserModel, FriendRequestModel } from "../models/index.js";
 
 // -------------------------- Update Profile --------------------------
 export const updateProfile = async (req, res, next) => {
