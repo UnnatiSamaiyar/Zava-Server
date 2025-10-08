@@ -785,7 +785,7 @@ export const generateInvite = async (req, res, next) => {
 
     res.status(201).json({
       status: "success",
-      inviteLink: `${process.env.FRONTEND_URL}/join/${code}`,
+      inviteLink: `${process.env.FRONT_URL}/join/${code}`,
       invite,
     });
   } catch (err) {
